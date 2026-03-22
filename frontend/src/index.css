@@ -1,0 +1,24 @@
+@import "tailwindcss";
+
+@theme {
+  --color-gold: #C5A572;
+  --color-gold-light: #D4BA8A;
+  --color-gold-dark: #A88B5A;
+  --color-charcoal: #2C2C2A;
+  --color-charcoal-light: #3D3D3B;
+  --color-light-gray: #F5F5F0;
+  --color-white: #FFFFFF;
+  --font-display: "Playfair Display", serif;
+  --font-body: "Inter", sans-serif;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--color-light-gray);
+  color: var(--color-charcoal);
+  margin: 0;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: var(--font-display);
+}

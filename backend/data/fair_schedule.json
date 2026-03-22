@@ -1,0 +1,42 @@
+[
+  {
+    "name": "Art Basel Hong Kong 2026",
+    "dates": "March 25-29, 2026",
+    "booth": "3D 28",
+    "sector": "Insights",
+    "artists": ["Chungji Lee"],
+    "exhibition_title": "O: Field of Unity",
+    "notes": "이정지 솔로, 1990년대 작품",
+    "status": "preparing"
+  },
+  {
+    "name": "Art Central Hong Kong 2026",
+    "dates": "March 24-29, 2026",
+    "booth": "B2",
+    "sector": "",
+    "artists": ["Yujin Kang", "Jungsoo Kim", "Manna Lee", "Youngji Lee", "Sangwon Lee", "ByoungYun Woo"],
+    "exhibition_title": "",
+    "notes": "",
+    "status": "preparing"
+  },
+  {
+    "name": "Galleries Art Fair 2026",
+    "dates": "April 8-12, 2026",
+    "booth": "D 14",
+    "sector": "",
+    "artists": ["Jungsoo Kim", "Jiyeon Song", "ByoungYun Woo", "Youngji Lee"],
+    "exhibition_title": "",
+    "notes": "",
+    "status": "preparing"
+  },
+  {
+    "name": "Expo Chicago 2026",
+    "dates": "April 9-12, 2026",
+    "booth": "",
+    "sector": "",
+    "artists": ["Yujin Kang", "Jungsoo Kim", "Jiyeon Song", "ByoungYun Woo", "Manna Lee", "Sangwon Lee", "Youngji Lee"],
+    "exhibition_title": "",
+    "notes": "",
+    "status": "preparing"
+  }
+]

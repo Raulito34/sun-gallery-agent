@@ -1,0 +1,83 @@
+[
+  {
+    "artist": "Youngji Lee",
+    "artist_kr": "이영지",
+    "title": "Tree and Bird - Spring",
+    "year": 2024,
+    "medium": "Natural mineral pigment on Korean hanji paper",
+    "dimensions": "130 x 162 cm",
+    "status": "available"
+  },
+  {
+    "artist": "Youngji Lee",
+    "artist_kr": "이영지",
+    "title": "Tree and Bird - Meditation",
+    "year": 2023,
+    "medium": "Natural mineral pigment on Korean hanji paper",
+    "dimensions": "97 x 130 cm",
+    "status": "available"
+  },
+  {
+    "artist": "Youngji Lee",
+    "artist_kr": "이영지",
+    "title": "Tree and Bird - Silence",
+    "year": 2025,
+    "medium": "Natural mineral pigment on Korean hanji paper",
+    "dimensions": "112 x 145 cm",
+    "status": "reserved"
+  },
+  {
+    "artist": "Jungsoo Kim",
+    "artist_kr": "김정수",
+    "title": "Azalea Garden I",
+    "year": 2024,
+    "medium": "Oil on canvas",
+    "dimensions": "100 x 80 cm",
+    "status": "available"
+  },
+  {
+    "artist": "Jungsoo Kim",
+    "artist_kr": "김정수",
+    "title": "Azalea Garden II",
+    "year": 2024,
+    "medium": "Oil on canvas",
+    "dimensions": "130 x 97 cm",
+    "status": "available"
+  },
+  {
+    "artist": "Jungsoo Kim",
+    "artist_kr": "김정수",
+    "title": "Azalea - Spring Bloom",
+    "year": 2025,
+    "medium": "Oil on canvas",
+    "dimensions": "162 x 130 cm",
+    "status": "sold"
+  },
+  {
+    "artist": "Chungji Lee",
+    "artist_kr": "이정지",
+    "title": "O-Series No.42",
+    "year": 1995,
+    "medium": "Oil on canvas, palette knife text inscription",
+    "dimensions": "150 x 120 cm",
+    "status": "available"
+  },
+  {
+    "artist": "Chungji Lee",
+    "artist_kr": "이정지",
+    "title": "O-Series No.58",
+    "year": 1998,
+    "medium": "Oil on canvas, palette knife text inscription",
+    "dimensions": "130 x 162 cm",
+    "status": "available"
+  },
+  {
+    "artist": "Chungji Lee",
+    "artist_kr": "이정지",
+    "title": "O-Series No.73",
+    "year": 1997,
+    "medium": "Oil on canvas, palette knife text inscription",
+    "dimensions": "112 x 145 cm",
+    "status": "reserved"
+  }
+]
