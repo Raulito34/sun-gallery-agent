@@ -1,0 +1,58 @@
+[
+  {
+    "name": "Ahmed",
+    "region": "UAE",
+    "interests": ["Youngji Lee"],
+    "type": "collector",
+    "notes": "이영지 작품에 관심"
+  },
+  {
+    "name": "Jason",
+    "region": "UK",
+    "interests": ["Chungji Lee"],
+    "type": "collector",
+    "notes": "런던 거주, 이정지 관심, Frieze Seoul 2025에서 접촉, 어머니와 상의 후 미구매 → 팔로업 중"
+  },
+  {
+    "name": "Amina Debbiche",
+    "region": "UAE",
+    "interests": ["Youngji Lee", "Jungsoo Kim"],
+    "type": "VIP",
+    "notes": "HE Saif Ghobash 문화자문관, 반복 구매 고객"
+  },
+  {
+    "name": "Zein",
+    "region": "UAE",
+    "interests": ["Jungsoo Kim"],
+    "type": "collector",
+    "notes": "Abu Dhabi Art 2025 구매 고객"
+  },
+  {
+    "name": "Jesse Slotterback",
+    "region": "International",
+    "interests": [],
+    "type": "art_advisor",
+    "notes": "일당 $350 + 판매 15% 커미션"
+  },
+  {
+    "name": "Ameera",
+    "region": "UAE",
+    "interests": [],
+    "type": "art_advisor",
+    "notes": "Abu Dhabi Art 2024 협업"
+  },
+  {
+    "name": "Sana Krishna",
+    "region": "India",
+    "interests": [],
+    "type": "media",
+    "notes": "Design Pataki, 뭄바이 프리랜서"
+  },
+  {
+    "name": "Léonore Larrera",
+    "region": "USA",
+    "interests": [],
+    "type": "media",
+    "notes": "MCAC, 캘리포니아"
+  }
+]
