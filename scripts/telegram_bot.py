@@ -14,11 +14,19 @@ Telegram 채팅으로 갤러리 업무 지시를 받아 Claude API로 처리하�
   /collectors     — 팔로업 필요 고객 목록
   /fairs          — 다가오는 페어 일정
   /scan           — 데일리 스캔 즉시 실행
+  /inbox          — 네이버웍스 안 읽은 메일 확인
+  /reply <번호>   — 수신 메일에 AI 답장 생성 + 발송 확인
+  /sendmail <to> <subject> | <body> — 메일 직접 발송
+  /wa <번호> <메시지> — WhatsApp 메시지 직접 발송
   (일반 텍스트)    — 자유 질문 (갤러리 컨텍스트 기반 응답)
 
 환경변수:
-  ANTHROPIC_API_KEY  — Claude API 키 (필수)
-  TELEGRAM_BOT_TOKEN — Telegram Bot API 토큰 (필수)
+  ANTHROPIC_API_KEY    — Claude API 키 (필수)
+  TELEGRAM_BOT_TOKEN   — Telegram Bot API 토큰 (필수)
+  NAVER_WORKS_EMAIL    — 네이버 웍스 이메일 (선택, /inbox 등에 필요)
+  NAVER_WORKS_PASSWORD — 네이버 웍스 외부 앱 비밀번호 (선택)
+  WHATSAPP_TOKEN       — WhatsApp Business API 토큰 (선택, /wa에 필요)
+  WHATSAPP_PHONE_ID    — WhatsApp 전화번호 ID (선택)
 
 실행:
   python scripts/telegram_bot.py
@@ -194,17 +202,24 @@ def cmd_start() -> str:
     return (
         "🎨 *Sun Gallery AI Assistant*\n"
         "선화랑 업무 도우미입니다.\n\n"
-        "📌 *명령어:*\n"
+        "📌 *AI 콘텐츠 생성:*\n"
         "/email `<내용>` — 이메일 드래프트\n"
         "/whatsapp `<내용>` — WhatsApp 답장\n"
         "/marketing `<내용>` — 마케팅 콘텐츠\n"
         "/document `<내용>` — 문서 생성\n"
         "/translate `<내용>` — 미술 번역\n"
-        "/fair `<내용>` — 페어 준비\n"
+        "/fair `<내용>` — 페어 준비\n\n"
+        "📬 *실제 이메일 연동 (네이버 웍스):*\n"
+        "/inbox — 안 읽은 메일 확인\n"
+        "/reply `<번호>` — AI 답장 생성\n"
+        "/sendmail `<수신자> <제목> | <본문>` — 메일 발송\n\n"
+        "💬 *WhatsApp 연동:*\n"
+        "/wa `<전화번호> <메시지>` — WhatsApp 발송\n\n"
+        "📊 *조회:*\n"
         "/collectors — 팔로업 필요 고객\n"
         "/fairs — 다가오는 페어 일정\n"
         "/scan — 데일리 스캔 즉시 실행\n\n"
-        "💬 명령어 없이 메시지를 보내면 자유 질문으로 처리됩니다."
+        "💭 명령어 없이 메시지를 보내면 자유 질문으로 처리됩니다."
     )
 
 
@@ -313,6 +328,171 @@ def cmd_general(text: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Email/WhatsApp integration commands
+# ---------------------------------------------------------------------------
+
+# Cache for inbox results (so /reply can reference them)
+_inbox_cache: list = []
+
+
+def cmd_inbox() -> str:
+    """Check unread emails from Naver Works."""
+    global _inbox_cache
+    try:
+        from naver_works_mail import NaverWorksMailReader
+    except ImportError:
+        return "Error: naver_works_mail 모듈을 찾을 수 없습니다."
+
+    email_addr = os.getenv("NAVER_WORKS_EMAIL")
+    password = os.getenv("NAVER_WORKS_PASSWORD")
+    if not email_addr or not password:
+        return (
+            "⚠️ 네이버 웍스 메일이 설정되지 않았습니다.\n\n"
+            "환경변수를 설정하세요:\n"
+            "`NAVER_WORKS_EMAIL` — 이메일 주소\n"
+            "`NAVER_WORKS_PASSWORD` — 외부 앱 비밀번호"
+        )
+
+    try:
+        with NaverWorksMailReader(email_addr, password) as reader:
+            emails = reader.fetch_unread(limit=5)
+    except Exception as e:
+        return f"메일 수신 오류: {e}"
+
+    if not emails:
+        return "📭 안 읽은 메일이 없습니다."
+
+    _inbox_cache = emails
+    lines = [f"📬 *안 읽은 메일* ({len(emails)}건)\n"]
+    for i, e in enumerate(emails, 1):
+        lines.append(
+            f"*{i}.* {e.sender_name}\n"
+            f"   제목: {e.subject}\n"
+            f"   날짜: {e.date}\n"
+            f"   내용: {e.body[:100]}...\n"
+        )
+    lines.append("💡 `/reply 1` 으로 AI 답장 생성")
+    return "\n".join(lines)
+
+
+def cmd_reply(text: str) -> str:
+    """Generate AI reply for an inbox email and offer to send."""
+    global _inbox_cache
+
+    if not text.strip():
+        return "사용법: /reply <번호>\n\n먼저 /inbox 로 메일을 확인하세요."
+
+    try:
+        idx = int(text.strip()) - 1
+    except ValueError:
+        return "번호를 입력하세요. 예: /reply 1"
+
+    if not _inbox_cache:
+        return "먼저 /inbox 로 메일을 확인하세요."
+
+    if idx < 0 or idx >= len(_inbox_cache):
+        return f"1~{len(_inbox_cache)} 사이 번호를 입력하세요."
+
+    mail = _inbox_cache[idx]
+    prompt = (
+        f"다음 수신 메일에 대한 답장을 작성해줘.\n\n"
+        f"보낸 사람: {mail.sender_name} <{mail.sender}>\n"
+        f"제목: {mail.subject}\n"
+        f"내용:\n{mail.body}\n\n"
+        f"갤러리 매니저 Joonwha Lee로서 전문적이고 간결한 답장을 작성해줘. "
+        f"Subject line을 포함해줘."
+    )
+
+    draft = call_claude("email", prompt)
+
+    return (
+        f"📧 *AI 답장 드래프트*\n"
+        f"To: {mail.sender}\n"
+        f"Re: {mail.subject}\n\n"
+        f"---\n{draft}\n---\n\n"
+        f"💡 발송하려면:\n"
+        f"`/sendmail {mail.sender} Re: {mail.subject} | (위 내용 복사)`"
+    )
+
+
+def cmd_sendmail(text: str) -> str:
+    """Send email via Naver Works SMTP."""
+    if not text.strip():
+        return (
+            "사용법: /sendmail <수신자> <제목> | <본문>\n\n"
+            "예: /sendmail ahmed@example.com Art Central Invitation | "
+            "Dear Ahmed, we would like to invite you..."
+        )
+
+    try:
+        from naver_works_mail import send_mail
+    except ImportError:
+        return "Error: naver_works_mail 모듈을 찾을 수 없습니다."
+
+    email_addr = os.getenv("NAVER_WORKS_EMAIL")
+    password = os.getenv("NAVER_WORKS_PASSWORD")
+    if not email_addr or not password:
+        return "⚠️ NAVER_WORKS_EMAIL, NAVER_WORKS_PASSWORD 환경변수를 설정하세요."
+
+    # Parse: /sendmail to@email.com Subject Here | Body here
+    if "|" not in text:
+        return "형식: /sendmail <수신자> <제목> | <본문>\n`|` 로 제목과 본문을 구분하세요."
+
+    header_part, body = text.split("|", 1)
+    parts = header_part.strip().split(None, 1)
+    if len(parts) < 2:
+        return "수신자와 제목을 모두 입력하세요."
+
+    to_addr = parts[0]
+    subject = parts[1].strip()
+    body = body.strip()
+
+    try:
+        send_mail(to_addr, subject, body)
+        return f"✅ 메일 발송 완료!\n\nTo: {to_addr}\nSubject: {subject}"
+    except Exception as e:
+        return f"❌ 메일 발송 실패: {e}"
+
+
+def cmd_wa(text: str) -> str:
+    """Send WhatsApp message via Business API."""
+    if not text.strip():
+        return (
+            "사용법: /wa <전화번호> <메시지>\n\n"
+            "예: /wa +971501234567 Hello, this is Sun Gallery."
+        )
+
+    try:
+        from whatsapp_api import send_whatsapp
+    except ImportError:
+        return "Error: whatsapp_api 모듈을 찾을 수 없습니다."
+
+    token = os.getenv("WHATSAPP_TOKEN")
+    phone_id = os.getenv("WHATSAPP_PHONE_ID")
+    if not token or not phone_id:
+        return (
+            "⚠️ WhatsApp이 설정되지 않았습니다.\n\n"
+            "환경변수를 설정하세요:\n"
+            "`WHATSAPP_TOKEN` — Meta 액세스 토큰\n"
+            "`WHATSAPP_PHONE_ID` — 전화번호 ID"
+        )
+
+    parts = text.strip().split(None, 1)
+    if len(parts) < 2:
+        return "전화번호와 메시지를 모두 입력하세요.\n예: /wa +971501234567 Hello"
+
+    phone = parts[0]
+    message = parts[1]
+
+    try:
+        result = send_whatsapp(phone, message)
+        msg_id = result.get("messages", [{}])[0].get("id", "unknown")
+        return f"✅ WhatsApp 발송 완료!\n\nTo: {phone}\nMessage ID: {msg_id}"
+    except Exception as e:
+        return f"❌ WhatsApp 발송 실패: {e}"
+
+
+# ---------------------------------------------------------------------------
 # Telegram Bot (Long Polling)
 # ---------------------------------------------------------------------------
 
@@ -413,6 +593,14 @@ class TelegramBot:
             return cmd_fairs()
         if lower == "/scan":
             return cmd_scan()
+        if lower == "/inbox":
+            return cmd_inbox()
+        if lower.startswith("/reply"):
+            return cmd_reply(text[len("/reply"):].strip())
+        if lower.startswith("/sendmail"):
+            return cmd_sendmail(text[len("/sendmail"):].strip())
+        if lower.startswith("/wa ") or lower == "/wa":
+            return cmd_wa(text[len("/wa"):].strip())
 
         for mode in ("email", "whatsapp", "marketing", "document", "translate", "fair"):
             if lower.startswith(f"/{mode}"):
@@ -433,6 +621,10 @@ class TelegramBot:
         try:
             self.api("setMyCommands", commands=[
                 {"command": "start", "description": "봇 소개 + 명령어 목록"},
+                {"command": "inbox", "description": "안 읽은 메일 확인"},
+                {"command": "reply", "description": "수신 메일에 AI 답장 생성"},
+                {"command": "sendmail", "description": "메일 직접 발송"},
+                {"command": "wa", "description": "WhatsApp 메시지 발송"},
                 {"command": "email", "description": "이메일 드래프트 생성"},
                 {"command": "whatsapp", "description": "WhatsApp 답장 생성"},
                 {"command": "marketing", "description": "마케팅 콘텐츠 생성"},
