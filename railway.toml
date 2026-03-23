@@ -1,7 +1,0 @@
-[build]
-builder = "nixpacks"
-
-[deploy]
-startCommand = "python scripts/telegram_bot.py"
-restartPolicyType = "ON_FAILURE"
-restartPolicyMaxRetries = 10
