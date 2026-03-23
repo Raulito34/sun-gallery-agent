@@ -1,0 +1,11 @@
+# Sun Gallery Agent — Railway Deployment
+# Telegram Bot + FastAPI 서버 (WhatsApp webhook 포함)
+
+# Backend API
+fastapi>=0.104.0
+uvicorn>=0.24.0
+anthropic>=0.39.0
+pydantic>=2.5.0
+python-dotenv>=1.0.0
+httpx>=0.25.0
+requests>=2.31.0
