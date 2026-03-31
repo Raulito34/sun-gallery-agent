@@ -109,15 +109,25 @@ class SACWebsiteClient:
         return self._patch(f"/api/exhibitions/{exhibition_id}", data)
 
     # ------------------------------------------------------------------
-    # News (뉴스)
+    # News (뉴스/공지)
     # ------------------------------------------------------------------
 
     def get_news(self, category: Optional[str] = None) -> list[dict]:
         params = {"category": category} if category else None
         return self._get("/api/news", params=params)
 
+    def get_news_item(self, news_id: int) -> dict:
+        return self._get(f"/api/news/{news_id}")
+
     def create_news(self, data: dict) -> dict:
+        """공지사항/뉴스 작성. data: {title, content, category}"""
         return self._post("/api/news", data, admin=True)
+
+    def update_news(self, news_id: int, data: dict) -> dict:
+        return self._patch(f"/api/news/{news_id}", data)
+
+    def delete_news(self, news_id: int) -> bool:
+        return self._delete(f"/api/news/{news_id}")
 
     # ------------------------------------------------------------------
     # Spaces & Pricing (공간/가격)
@@ -137,11 +147,37 @@ class SACWebsiteClient:
         return self._post("/api/contact", data)
 
     # ------------------------------------------------------------------
-    # Site Images
+    # Site Images (홈페이지 이미지 관리)
     # ------------------------------------------------------------------
 
     def get_site_images(self) -> list[dict]:
         return self._get("/api/site-images")
+
+    def update_site_image(self, key: str, image_url: str, label: str = "") -> dict:
+        """홈페이지 이미지 업데이트. key로 식별."""
+        data: dict = {"imageUrl": image_url}
+        if label:
+            data["label"] = label
+        return self._patch(f"/api/site-images/{key}", data)
+
+    def create_site_image(self, key: str, image_url: str, label: str = "") -> dict:
+        """새 홈페이지 이미지 등록."""
+        return self._post("/api/site-images", {"key": key, "imageUrl": image_url, "label": label}, admin=True)
+
+    def delete_site_image(self, key: str) -> bool:
+        return self._delete(f"/api/site-images/{key}")
+
+    # ------------------------------------------------------------------
+    # Admin composite operations (에이전트용)
+    # ------------------------------------------------------------------
+
+    def update_exhibition_image(self, exhibition_id: int, image_url: str) -> dict:
+        """전시 이미지만 업데이트."""
+        return self.update_exhibition(exhibition_id, {"imageUrl": image_url})
+
+    def publish_announcement(self, title: str, content: str, category: str = "공지") -> dict:
+        """공지사항 게시."""
+        return self.create_news({"title": title, "content": content, "category": category})
 
 
 # ---------------------------------------------------------------------------

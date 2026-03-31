@@ -258,6 +258,13 @@ def cmd_start() -> str:
         "/collectors — 팔로업 필요 고객\n"
         "/fairs — 다가오는 페어 일정\n"
         "/scan — 데일리 스캔\n\n"
+        "🌐 *홈페이지 어드민:*\n"
+        "/site_images — 사이트 이미지 목록\n"
+        "/update_image `<key> <URL>` — 이미지 교체\n"
+        "/update_ex_image `<ID> <URL>` — 전시 이미지 교체\n"
+        "/news_list — 공지 목록\n"
+        "/news_write `<제목> | <내용>` — 공지 작성\n"
+        "/site_sync — 사이트 동기화 현황\n\n"
         "🤖 *Agent:*\n"
         "/agent — 에이전트 상태\n"
         "/pending — 승인 대기 목록\n"
@@ -715,6 +722,192 @@ def cmd_sns_queue() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Website Admin commands
+# ---------------------------------------------------------------------------
+
+def cmd_site_images() -> str:
+    """List all site images."""
+    client = _get_sac_client()
+    if not client:
+        return "⚠️ SAC_API_URL 환경변수를 설정하세요."
+    try:
+        images = client.get_site_images()
+    except Exception as e:
+        return f"SAC API 오류: {e}"
+
+    if not images:
+        return "🖼 등록된 사이트 이미지가 없습니다."
+
+    lines = [f"🖼 *사이트 이미지* ({len(images)}개)\n"]
+    for img in images:
+        label = img.get("label", "") or "(라벨 없음)"
+        url_short = (img.get("imageUrl", ""))[:60]
+        lines.append(f"• `{img['key']}` — {label}\n  {url_short}...")
+    lines.append("\n교체: `/update_image <key> <새 URL>`")
+    return "\n".join(lines)
+
+
+def cmd_update_image(text: str) -> str:
+    """Update a site image URL."""
+    client = _get_sac_client()
+    if not client:
+        return "⚠️ SAC_API_URL 환경변수를 설정하세요."
+    parts = text.strip().split(None, 1)
+    if len(parts) < 2:
+        return "사용법: /update_image <key> <이미지 URL>"
+    key, url = parts
+    try:
+        result = client.update_site_image(key, url)
+        return f"✅ 이미지 업데이트 완료: `{key}`\n\n🔗 마케팅 에이전트에 알림이 전송됩니다."
+    except Exception as e:
+        return f"❌ 업데이트 실패: {e}"
+
+
+def cmd_update_exhibition_image(text: str) -> str:
+    """Update exhibition image."""
+    client = _get_sac_client()
+    if not client:
+        return "⚠️ SAC_API_URL 환경변수를 설정하세요."
+    parts = text.strip().split(None, 1)
+    if len(parts) < 2:
+        return "사용법: /update_ex_image <전시ID> <이미지 URL>"
+    try:
+        ex_id = int(parts[0])
+    except ValueError:
+        return "전시 ID는 숫자여야 합니다."
+    try:
+        result = client.update_exhibition_image(ex_id, parts[1])
+        return f"✅ 전시 #{ex_id} 이미지 업데이트 완료!\n\n🔗 마케팅 에이전트에 알림이 전송됩니다."
+    except Exception as e:
+        return f"❌ 업데이트 실패: {e}"
+
+
+def cmd_news_list() -> str:
+    """List recent news/announcements."""
+    client = _get_sac_client()
+    if not client:
+        return "⚠️ SAC_API_URL 환경변수를 설정하세요."
+    try:
+        news = client.get_news()
+    except Exception as e:
+        return f"SAC API 오류: {e}"
+
+    if not news:
+        return "📰 등록된 공지사항이 없습니다."
+
+    lines = [f"📰 *공지사항* ({len(news)}건)\n"]
+    for n in news[:10]:
+        lines.append(
+            f"• *#{n['id']}* [{n.get('category', '')}] {n.get('title', '')}\n"
+            f"  {str(n.get('createdAt', ''))[:10]}"
+        )
+    return "\n".join(lines)
+
+
+def cmd_news_write(text: str, bot=None, chat_id=None) -> str:
+    """Write and publish an announcement. Can also auto-generate with Claude."""
+    if not text.strip():
+        return (
+            "사용법:\n"
+            "`/news_write <제목> | <내용>` — 직접 작성\n"
+            "`/news_write auto <전시ID>` — AI가 전시 공지 자동 작성\n"
+            "`/news_write 휴관 <날짜> <사유>` — 휴관 공지 자동 작성"
+        )
+
+    client = _get_sac_client()
+    if not client:
+        return "⚠️ SAC_API_URL 환경변수를 설정하세요."
+
+    # Auto-generate mode
+    if text.strip().startswith("auto"):
+        parts = text.strip().split(None, 1)
+        if len(parts) < 2:
+            return "사용법: /news_write auto <전시ID>"
+        try:
+            ex_id = int(parts[1])
+            exhibition = client.get_exhibition(ex_id)
+        except Exception as e:
+            return f"전시 조회 실패: {e}"
+
+        draft = call_claude("sac", (
+            f"Sun Art Center 전시 공지문을 작성해줘.\n\n"
+            f"전시: {exhibition.get('title', '')}\n"
+            f"작가: {exhibition.get('artist', '')}\n"
+            f"기간: {exhibition.get('startDate', '')} ~ {exhibition.get('endDate', '')}\n"
+            f"층: {exhibition.get('floor', '')}\n"
+            f"설명: {exhibition.get('description', '')}\n\n"
+            f"공지 카테고리: 전시\n"
+            f"공식적이고 정중한 톤으로. 관람 안내 포함."
+        ), brand="sac")
+
+        if bot and chat_id:
+            from agent_state import make_task_id
+            task_id = make_task_id("news_auto", str(ex_id))
+            msg = f"📰 *공지문 미리보기*\n\n---\n{draft[:2000]}\n---"
+            bot.send_with_keyboard(chat_id, msg, task_id, buttons=[
+                ("✅ 게시", f"news_publish:{ex_id}"),
+                ("❌ 취소", f"dismiss:{task_id}"),
+            ])
+            from agent_state import AgentState
+            state = AgentState()
+            state.add_pending(task_id, "news_draft", draft, metadata={"exhibition_id": ex_id, "title": f"[Sun Art Center] {exhibition.get('artist', '')} '{exhibition.get('title', '')}'"})
+            state.save()
+            return ""  # Message already sent with keyboard
+
+        return f"📰 *공지문 드래프트*\n\n{draft}"
+
+    # Manual mode: /news_write 제목 | 내용
+    if "|" not in text:
+        return "형식: /news_write <제목> | <내용>"
+
+    title, content = text.split("|", 1)
+    try:
+        result = client.create_news({"title": title.strip(), "content": content.strip(), "category": "공지"})
+        return f"✅ 공지 게시 완료! (#{result.get('id', '')})\n\n제목: {title.strip()}"
+    except Exception as e:
+        return f"❌ 게시 실패: {e}"
+
+
+def cmd_site_sync(bot=None, chat_id=None) -> str:
+    """Sync website changes → trigger marketing agent."""
+    client = _get_sac_client()
+    if not client:
+        return "⚠️ SAC_API_URL 환경변수를 설정하세요."
+
+    try:
+        exhibitions = client.get_exhibitions("current")
+        news = client.get_news()
+        images = client.get_site_images()
+    except Exception as e:
+        return f"SAC API 오류: {e}"
+
+    lines = [
+        "🔄 *사이트 동기화 현황*\n",
+        f"현재 전시: {len(exhibitions)}건",
+        f"공지사항: {len(news)}건",
+        f"사이트 이미지: {len(images)}개\n",
+    ]
+
+    # Check for exhibitions without proper images
+    placeholder_exhibitions = [
+        ex for ex in exhibitions
+        if not ex.get("imageUrl") or "placeholder" in ex.get("imageUrl", "").lower()
+        or "unsplash" in ex.get("imageUrl", "").lower()
+    ]
+    if placeholder_exhibitions:
+        lines.append(f"⚠️ *이미지 교체 필요* ({len(placeholder_exhibitions)}건):")
+        for ex in placeholder_exhibitions:
+            lines.append(f"  • #{ex['id']} {ex.get('title', '')} ({ex.get('floor', '')})")
+        lines.append("\n`/update_ex_image <ID> <URL>`로 교체")
+
+    # Suggest marketing sync
+    if exhibitions and bot and chat_id:
+        lines.append("\n💡 `/sns_generate 이번 주 전시 캘린더`로 SNS 콘텐츠도 업데이트하세요.")
+
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Agent Loop — Proactive Scanning
 # ---------------------------------------------------------------------------
 
@@ -763,6 +956,9 @@ class AgentLoop:
 
         # --- Scan 4: SNS marketing schedule ---
         tasks_found += self._scan_sns_schedule(bot, state, today, chat_id)
+
+        # --- Scan 5: Cross-agent tasks (admin ↔ marketing) ---
+        tasks_found += self._scan_cross_agent(bot, state, today, chat_id)
 
         state.update_scan_time()
         state.cleanup_old(days=7)
@@ -963,6 +1159,56 @@ class AgentLoop:
 
 
 # ---------------------------------------------------------------------------
+    def _scan_cross_agent(self, bot, state, today, chat_id) -> int:
+        """Process cross-agent tasks (admin ↔ marketing communication)."""
+        count = 0
+        pending = state.list_pending()
+
+        for p in pending:
+            task_type = p.get("type", "")
+
+            if task_type == "cross_news_published":
+                # Admin published news → Marketing should create SNS post
+                title = p.get("metadata", {}).get("title", "")
+                draft = p.get("draft", "")
+                sns_prompt = (
+                    f"방금 홈페이지에 게시된 공지를 SNS 포스트로 변환해줘:\n\n"
+                    f"제목: {title}\n"
+                    f"내용: {draft[:1000]}\n\n"
+                    f"Instagram + X 두 버전으로."
+                )
+                sns_draft = call_claude("sns", sns_prompt, brand="sac")
+                sns_task_id = f"sns_from_news_{p['id']}"
+
+                msg = (
+                    f"🔗 *어드민→마케팅 연동*\n"
+                    f"새 공지 '{title}' 기반 SNS 포스트:\n\n"
+                    f"---\n{sns_draft[:1500]}\n---"
+                )
+                bot.send_with_keyboard(chat_id, msg, sns_task_id, buttons=[
+                    ("✅ 승인 & 큐 추가", f"sns_approve:{sns_task_id}"),
+                    ("❌ 건너뛰기", f"dismiss:{sns_task_id}"),
+                ])
+                state.add_pending(sns_task_id, "sns_content", sns_draft,
+                                  metadata={"content_type": "news_share", "source": p["id"]})
+                state.approve(p["id"])  # Mark cross-task as handled
+                count += 1
+
+            elif task_type == "cross_exhibition_image_updated":
+                # Admin updated exhibition image → Marketing notified
+                ex_id = p.get("metadata", {}).get("exhibition_id", "")
+                bot.send_message(
+                    chat_id,
+                    f"📸 전시 #{ex_id} 이미지가 업데이트되었습니다.\n"
+                    f"`/sns_generate 전시 #{ex_id} 홍보 포스트`로 새 이미지 기반 콘텐츠를 만드세요."
+                )
+                state.approve(p["id"])
+                count += 1
+
+        return count
+
+
+# ---------------------------------------------------------------------------
 # Agent status commands
 # ---------------------------------------------------------------------------
 
@@ -1130,6 +1376,8 @@ class TelegramBot:
             self._handle_rental_action(chat_id, msg_id, payload, "rejected")
         elif action == "sns_approve":
             self._handle_sns_approve(chat_id, msg_id, payload)
+        elif action == "news_publish":
+            self._handle_news_publish(chat_id, msg_id, payload)
 
     def _handle_approve(self, chat_id, msg_id, task_id):
         from agent_state import AgentState
@@ -1246,6 +1494,55 @@ class TelegramBot:
             f"이미지 프롬프트: {parsed.get('image_prompt', 'N/A')[:200]}"
         )
 
+    def _handle_news_publish(self, chat_id, msg_id, ex_id_str):
+        """Publish a news draft and trigger marketing agent."""
+        from agent_state import AgentState, make_task_id
+        state = AgentState()
+
+        # Find the pending news draft
+        task_id = make_task_id("news_auto", ex_id_str)
+        pending = state.get_pending(task_id)
+        if not pending:
+            self.send_message(chat_id, "⚠️ 이 공지는 이미 처리되었습니다.")
+            return
+
+        client = _get_sac_client()
+        if not client:
+            self.send_message(chat_id, "⚠️ SAC API 연결 실패")
+            return
+
+        title = pending.get("metadata", {}).get("title", "공지")
+        draft = pending.get("draft", "")
+
+        try:
+            result = client.create_news({"title": title, "content": draft, "category": "전시"})
+            news_id = result.get("id", "")
+        except Exception as e:
+            self.send_message(chat_id, f"❌ 공지 게시 실패: {e}")
+            return
+
+        state.approve(task_id)
+
+        # Cross-agent: trigger marketing agent to create SNS post
+        cross_task_id = make_task_id("cross_news_published", str(news_id))
+        state.add_pending(
+            cross_task_id, "cross_news_published",
+            draft, metadata={"news_id": news_id, "title": title},
+        )
+        state.save()
+
+        try:
+            self.api("editMessageReplyMarkup", chat_id=chat_id, message_id=msg_id, reply_markup={"inline_keyboard": []})
+        except Exception:
+            pass
+
+        self.send_message(
+            chat_id,
+            f"✅ 공지 게시 완료! (#{news_id})\n\n"
+            f"🔗 마케팅 에이전트에 SNS 포스트 생성 요청이 전송되었습니다.\n"
+            f"다음 스캔 시 자동으로 SNS 콘텐츠가 생성됩니다."
+        )
+
     def get_updates(self) -> list[dict]:
         """Long-poll for new messages."""
         try:
@@ -1341,6 +1638,22 @@ class TelegramBot:
         if lower == "/resume":
             self.agent.paused = False
             return "▶️ Agent 스캔 재개됨."
+
+        # --- Website Admin ---
+        if lower == "/site_images":
+            return cmd_site_images()
+        if lower.startswith("/update_image"):
+            return cmd_update_image(text[len("/update_image"):].strip())
+        if lower.startswith("/update_ex_image"):
+            return cmd_update_exhibition_image(text[len("/update_ex_image"):].strip())
+        if lower == "/news_list":
+            return cmd_news_list()
+        if lower.startswith("/news_write"):
+            body = text[len("/news_write"):].strip()
+            result = cmd_news_write(body, bot=self, chat_id=message_chat_id if 'message_chat_id' in dir() else None)
+            return result if result else "공지문 미리보기가 발송되었습니다."
+        if lower == "/site_sync":
+            return cmd_site_sync(bot=self, chat_id=None)
 
         # --- Existing commands ---
         if lower == "/collectors":
