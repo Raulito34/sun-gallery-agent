@@ -1,0 +1,17 @@
+{
+  "spaces": [
+    {"name": "B1", "floor": "B1F", "size_pyeong": 40, "area_sqm": 200, "rental_fee_1week_krw": 2200000, "rental_fee_2weeks_krw": 4000000, "rental_fee_3weeks_krw": 5600000, "rental_fee_4weeks_krw": 7000000},
+    {"name": "1F", "floor": "1F", "size_pyeong": 30, "area_sqm": 150, "rental_fee_1week_krw": 2700000, "rental_fee_2weeks_krw": 5000000, "rental_fee_3weeks_krw": 7000000, "rental_fee_4weeks_krw": 9000000},
+    {"name": "2F", "floor": "2F", "size_pyeong": 25, "area_sqm": 150, "rental_fee_1week_krw": 1900000, "rental_fee_2weeks_krw": 3500000, "rental_fee_3weeks_krw": 5000000, "rental_fee_4weeks_krw": 6200000},
+    {"name": "3F", "floor": "3F", "size_pyeong": 25, "area_sqm": 150, "rental_fee_1week_krw": 1900000, "rental_fee_2weeks_krw": 3500000, "rental_fee_3weeks_krw": 5000000, "rental_fee_4weeks_krw": 6200000},
+    {"name": "4F", "floor": "4F", "size_pyeong": 20, "area_sqm": 150, "rental_fee_1week_krw": 1700000, "rental_fee_2weeks_krw": 3000000, "rental_fee_3weeks_krw": 4200000, "rental_fee_4weeks_krw": 5200000}
+  ],
+  "policies": {
+    "deposit_percent": 50,
+    "cancellation_days": 14,
+    "setup_days": 2,
+    "teardown_days": 1,
+    "operating_hours": "화-일 10:00-18:00",
+    "closed_day": "월요일"
+  }
+}
