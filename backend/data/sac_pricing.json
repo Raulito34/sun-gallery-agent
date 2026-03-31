@@ -1,0 +1,38 @@
+{
+  "spaces": [
+    {"name": "1F", "floor": "1F", "area_sqm": 120, "size_pyeong": 35},
+    {"name": "2F", "floor": "2F", "area_sqm": 250, "size_pyeong": 75},
+    {"name": "3F", "floor": "3F", "area_sqm": 250, "size_pyeong": 75},
+    {"name": "4F", "floor": "4F", "area_sqm": 70, "size_pyeong": 20},
+    {"name": "B1F", "floor": "B1F", "area_sqm": 250, "size_pyeong": 75}
+  ],
+  "seasons": {
+    "비성수기": {
+      "months": "1-2월, 7-8월",
+      "prices_만원": {"1F": 500, "2F": 450, "3F": 350, "4F": 150, "B1F": 300}
+    },
+    "일반": {
+      "months": "3-6월, 12월",
+      "prices_만원": {"1F": 550, "2F": 500, "3F": 400, "4F": 200, "B1F": 350}
+    },
+    "성수기": {
+      "months": "9-11월",
+      "prices_만원": {"1F": 600, "2F": 550, "3F": 450, "4F": 200, "B1F": 400}
+    }
+  },
+  "notes": [
+    "상기 요금은 1주 기본 대관료이며, VAT는 별도입니다.",
+    "2주 이상 대관 시 별도 할인이 적용됩니다.",
+    "2개 이상의 전시관을 동시 대관 시 10% 할인이 적용됩니다.",
+    "비영리 단체 및 신진 작가의 경우 별도 협의가 가능합니다.",
+    "대관료에는 기본 조명, 전기, 냉난방비가 포함되어 있습니다.",
+    "설치/철수 기간은 대관 기간에 포함됩니다."
+  ],
+  "policies": {
+    "deposit_percent": 50,
+    "cancellation_days": 14,
+    "vat_separate": true,
+    "operating_hours": "화-일 10:00-18:00",
+    "closed_day": "월요일"
+  }
+}

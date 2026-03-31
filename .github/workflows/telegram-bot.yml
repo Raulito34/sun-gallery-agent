@@ -1,0 +1,64 @@
+name: Telegram Bot — Sun Gallery Agentic AI
+
+# GitHub Actions 최대 실행 시간: 6시간
+# 5시간마다 새 실행을 시작하여 끊김 없이 봇 유지
+on:
+  schedule:
+    # 매 5시간마다 실행 (UTC): 00:00, 05:00, 10:00, 15:00, 20:00
+    - cron: '0 0/5 * * *'
+  workflow_dispatch:
+    # 수동 실행 (처음 시작 / 재시작)
+
+# 동시에 하나만 실행 — 새 실행이 시작되면 이전 실행을 취소
+concurrency:
+  group: telegram-bot
+  cancel-in-progress: true
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350  # 5시간 50분 (6시간 제한 전에 종료)
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install anthropic requests
+
+      # Agent state 캐시 복원 (봇 재시작 간 상태 유지)
+      - name: Restore agent state
+        uses: actions/cache/restore@v4
+        with:
+          path: backend/data/agent_state.json
+          key: agent-state
+
+      - name: Run Telegram bot
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SAC_API_URL: ${{ secrets.SAC_API_URL }}
+          SAC_ADMIN_CODE: ${{ secrets.SAC_ADMIN_CODE }}
+          NAVER_WORKS_EMAIL: ${{ secrets.NAVER_WORKS_EMAIL }}
+          NAVER_WORKS_PASSWORD: ${{ secrets.NAVER_WORKS_PASSWORD }}
+          WHATSAPP_TOKEN: ${{ secrets.WHATSAPP_TOKEN }}
+          WHATSAPP_PHONE_ID: ${{ secrets.WHATSAPP_PHONE_ID }}
+        run: |
+          echo "Starting Agentic Telegram bot at $(date)"
+          # 5시간 45분 후 자동 종료 (다음 cron이 새 인스턴스를 시작)
+          timeout 20700 python scripts/telegram_bot.py || true
+          echo "Bot stopped at $(date)"
+
+      # Agent state 캐시 저장 (다음 실행에서 복원)
+      - name: Save agent state
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: backend/data/agent_state.json
+          key: agent-state-${{ github.run_id }}
