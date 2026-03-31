@@ -1,0 +1,88 @@
+{
+  "brand": {
+    "name_ko": "선아트센터",
+    "name_en": "Sun Art Center",
+    "location_ko": "서울 종로구 인사동",
+    "location_en": "Insadong, Seoul",
+    "hours": "화-일 10:00-18:00 | 월요일 휴관",
+    "hours_en": "Tue-Sun 10am-6pm | Closed Mon",
+    "email": "sungallery1977@gmail.com",
+    "phone": "+82 2-734-0458",
+    "website": "rauliton34-qq16.vercel.app",
+    "instagram": "@sunartcenter",
+    "x": "@sunartcenter"
+  },
+  "hashtags": {
+    "core": ["#SunArtCenter", "#선아트센터"],
+    "location": ["#인사동", "#인사동전시", "#종로", "#Insadong", "#Seoul"],
+    "art": ["#현대미술", "#ContemporaryArt", "#KoreanArt", "#ArtExhibition"],
+    "gallery": ["#갤러리", "#ArtGallery", "#전시", "#Exhibition"],
+    "rental": ["#갤러리대관", "#전시공간", "#ArtSpace", "#GalleryRental"],
+    "free": ["#무료관람", "#FreeExhibition", "#FreeAdmission"],
+    "event": ["#오프닝", "#OpeningReception", "#ArtEvent"],
+    "behind": ["#비하인드", "#BehindTheScenes", "#ArtInstallation"]
+  },
+  "content_types": {
+    "weekly_calendar": {
+      "weekday": 0,
+      "description": "이번 주 전시 캘린더",
+      "tone": "정보 전달 중심, 깔끔한 리스트 형식",
+      "emoji_start": "🎨",
+      "title_ko": "This Week at Sun Art Center",
+      "hashtag_groups": ["core", "location", "art", "free"]
+    },
+    "artist_spotlight": {
+      "weekday": 2,
+      "description": "참여 작가 심층 소개",
+      "tone": "작가의 작업 세계와 전시 의미 조명, 감성적",
+      "emoji_start": "🎨",
+      "title_ko": "Artist Spotlight",
+      "hashtag_groups": ["core", "art", "location"]
+    },
+    "space_highlight": {
+      "weekday": 4,
+      "description": "전시 공간 매력 어필, 대관 유도",
+      "tone": "공간의 물리적 장점 + 인사동 문화적 가치",
+      "emoji_start": "🏛",
+      "title_ko": "Space Highlight",
+      "hashtag_groups": ["core", "rental", "location", "gallery"]
+    },
+    "opening_reception": {
+      "weekday": null,
+      "description": "오프닝 리셉션 초대",
+      "tone": "초대하는 느낌, 따뜻하고 환영하는",
+      "emoji_start": "🥂",
+      "title_ko": "Opening Reception",
+      "hashtag_groups": ["core", "event", "art", "free"]
+    },
+    "behind_the_scenes": {
+      "weekday": null,
+      "description": "설치 과정, 준비 비하인드",
+      "tone": "비공식적, 생동감 있는, 현장감",
+      "emoji_start": "🔧",
+      "title_ko": "Behind the Scenes",
+      "hashtag_groups": ["core", "behind", "art"]
+    }
+  },
+  "image_prompt_templates": {
+    "exhibition": "Contemporary art exhibition in a minimalist white gallery space, {artwork_type}, dramatic lighting, warm tones, architectural photography, 4:5 aspect ratio",
+    "space_b1": "Underground gallery space with high ceilings, dramatic spotlighting, video installation art, dark atmospheric mood, modern architecture, 4:5",
+    "space_1f": "Ground floor gallery entrance in traditional Korean neighborhood, modern interior meets hanok district exterior, inviting atmosphere, 4:5",
+    "space_upper": "Bright gallery room with white walls, natural light through windows, contemporary paintings displayed, clean modern aesthetic, 4:5",
+    "opening": "Art gallery opening reception, diverse guests viewing artwork, champagne glasses, warm evening lighting, candid documentary style, 4:5",
+    "behind": "Artists and crew installing artwork in gallery, ladders and tools visible, work in progress aesthetic, documentary style, 4:5",
+    "calendar": "Clean flat-lay or graphic design style image showing a weekly art calendar, modern typography, gold and charcoal color scheme, 1:1"
+  },
+  "caption_structures": {
+    "instagram": {
+      "order": ["emoji_title", "separator", "body_ko", "details", "separator", "body_en", "blank", "hashtags"],
+      "separator": "━━━━━━━━━━━━━━━━━━━━",
+      "max_chars": 2200,
+      "ideal_chars": "800-1200"
+    },
+    "x": {
+      "order": ["emoji_title", "body_short", "details_short", "hashtags_3"],
+      "max_chars": 280
+    }
+  }
+}

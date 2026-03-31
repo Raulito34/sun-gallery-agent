@@ -23,6 +23,37 @@ import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 QUEUE_PATH = ROOT / "backend" / "data" / "sns_content_queue.json"
+TEMPLATES_PATH = ROOT / "backend" / "data" / "sns_templates.json"
+
+
+def load_templates() -> dict:
+    """Load SNS templates including brand info, hashtags, content types."""
+    if not TEMPLATES_PATH.exists():
+        return {}
+    try:
+        return json.loads(TEMPLATES_PATH.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def get_hashtags(groups: list[str]) -> str:
+    """Get combined hashtags from template groups."""
+    templates = load_templates()
+    all_tags = templates.get("hashtags", {})
+    tags = []
+    for g in groups:
+        tags.extend(all_tags.get(g, []))
+    return " ".join(dict.fromkeys(tags))  # dedupe, preserve order
+
+
+def get_image_prompt(template_key: str, **kwargs) -> str:
+    """Get image prompt template with variable substitution."""
+    templates = load_templates()
+    prompts = templates.get("image_prompt_templates", {})
+    prompt = prompts.get(template_key, "")
+    for k, v in kwargs.items():
+        prompt = prompt.replace(f"{{{k}}}", str(v))
+    return prompt
 
 # ---------------------------------------------------------------------------
 # Content Queue
@@ -106,6 +137,11 @@ SAC_BRAND = {
 
 def build_exhibition_post_prompt(exhibition: dict) -> str:
     """전시 홍보 포스트용 Claude 프롬프트."""
+    templates = load_templates()
+    brand = templates.get("brand", SAC_BRAND)
+    hashtags = get_hashtags(["core", "location", "art", "free"])
+    img_prompt = get_image_prompt("exhibition", artwork_type=exhibition.get("description", "artwork")[:50])
+
     return (
         f"Sun Art Center 전시 홍보 Instagram/X 포스트를 작성해줘.\n\n"
         f"전시 정보:\n"
@@ -115,16 +151,17 @@ def build_exhibition_post_prompt(exhibition: dict) -> str:
         f"- 층: {exhibition.get('floor', '')}\n"
         f"- 설명: {exhibition.get('description', '')}\n\n"
         f"갤러리 정보:\n"
-        f"- 이름: {SAC_BRAND['name_en']} ({SAC_BRAND['name_ko']})\n"
-        f"- 위치: {SAC_BRAND['location']}\n"
-        f"- 운영: {SAC_BRAND['hours']}\n\n"
+        f"- 이름: {brand.get('name_en', 'Sun Art Center')} ({brand.get('name_ko', '선아트센터')})\n"
+        f"- 위치: {brand.get('location_ko', '서울 종로구 인사동')}\n"
+        f"- 운영: {brand.get('hours', '화-일 10:00-18:00')}\n\n"
+        f"해시태그 후보: {hashtags}\n\n"
         f"요구사항:\n"
         f"1. 한국어 + 영어 병기 (한국어 먼저, 영어 아래)\n"
         f"2. 이모지 적절히 사용\n"
-        f"3. 해시태그 10-15개 (기본: {', '.join(SAC_BRAND['hashtags_base'][:5])})\n"
+        f"3. 해시태그 10-15개\n"
         f"4. Instagram용 (최대 2200자)과 X용 (최대 280자) 두 버전 생성\n"
         f"5. '선화랑' 브랜드는 절대 사용하지 말 것. 'Sun Art Center'/'선아트센터'만 사용\n"
-        f"6. AI 이미지 생성용 프롬프트도 영문으로 1줄 포함"
+        f"6. AI 이미지 생성용 프롬프트 (참고: {img_prompt[:100]})"
     )
 
 
