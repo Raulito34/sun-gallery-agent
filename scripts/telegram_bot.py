@@ -945,8 +945,8 @@ class AgentLoop:
         today = date.today()
         tasks_found = 0
 
-        # --- Scan 1: Collector follow-ups ---
-        tasks_found += self._scan_collector_followups(bot, state, today, chat_id)
+        # --- Scan 1: Incoming emails (real tasks from inbox) ---
+        tasks_found += self._scan_inbox(bot, state, today, chat_id)
 
         # --- Scan 2: Fair milestones ---
         tasks_found += self._scan_fair_milestones(bot, state, today, chat_id)
@@ -967,47 +967,74 @@ class AgentLoop:
         if tasks_found:
             print(f"[AgentLoop] Scan complete: {tasks_found} new items")
 
-    def _scan_collector_followups(self, bot, state, today, chat_id) -> int:
+    def _scan_inbox(self, bot, state, today, chat_id) -> int:
+        """Scan real email inbox for new messages and generate action items."""
         from agent_state import make_task_id
-        collectors = load_json(COLLECTORS_PATH)
+
+        try:
+            from naver_works_mail import NaverWorksMailReader
+        except ImportError:
+            return 0
+
+        email_addr = os.getenv("NAVER_WORKS_EMAIL")
+        password = os.getenv("NAVER_WORKS_PASSWORD")
+        if not email_addr or not password:
+            return 0
+
+        try:
+            with NaverWorksMailReader(email_addr, password) as reader:
+                emails = reader.fetch_unread(limit=5)
+        except Exception as e:
+            print(f"[AgentLoop] Inbox scan error: {e}")
+            return 0
+
+        if not emails:
+            return 0
+
         count = 0
-        followup_statuses = {"interested", "pending_followup", "vip"}
-
-        for c in collectors:
-            status = (c.get("status") or "").lower()
-            if status not in followup_statuses:
-                continue
-            last = c.get("last_contact")
-            if not last:
-                continue
-            try:
-                days = (today - datetime.strptime(last, "%Y-%m-%d").date()).days
-            except ValueError:
-                continue
-            if days < 7:
-                continue
-
-            task_id = make_task_id("followup", c["name"], today.isoformat())
+        for mail in emails:
+            task_id = make_task_id("inbox", mail.uid, today.isoformat())
             if state.was_acted_on(task_id):
                 continue
 
-            interests = ", ".join(c.get("interests", []))
-            draft = call_claude("email", (
-                f"Write a follow-up email to collector {c['name']} ({c.get('region', '')}).\n"
-                f"Interests: {interests}\n"
-                f"Last contact: {last} ({days} days ago)\n"
-                f"Be warm and reference their interests."
+            # Ask Claude to analyze the email and decide what to do
+            analysis = call_claude("general", (
+                f"수신 이메일을 분석하고 필요한 액션을 판단해줘.\n\n"
+                f"보낸 사람: {mail.sender_name} <{mail.sender}>\n"
+                f"제목: {mail.subject}\n"
+                f"내용:\n{mail.body[:2000]}\n\n"
+                f"판단해줘:\n"
+                f"1. 이 메일이 답장이 필요한가? (yes/no)\n"
+                f"2. 필요하다면 어떤 내용으로? (간단히)\n"
+                f"3. 긴급도 (high/medium/low)\n"
+                f"4. 카테고리 (대관문의/작품문의/페어/기타)\n\n"
+                f"그리고 적절한 답장 드래프트를 작성해줘."
             ))
 
+            urgency = "🔴" if "high" in analysis.lower() else "🟡" if "medium" in analysis.lower() else "🟢"
+
             msg = (
-                f"👤 *팔로업 필요*\n\n"
-                f"*{c['name']}* [{c.get('region', '')}]\n"
-                f"관심: {interests}\n"
-                f"마지막 연락: {last} ({days}일 전)\n\n"
-                f"---\n{draft[:1500]}\n---"
+                f"📬 *수신 메일* {urgency}\n\n"
+                f"From: {mail.sender_name} <{mail.sender}>\n"
+                f"Subject: {mail.subject}\n"
+                f"Date: {mail.date}\n\n"
+                f"💡 *AI 분석 & 답장 드래프트:*\n"
+                f"---\n{analysis[:1800]}\n---"
             )
-            bot.send_with_keyboard(chat_id, msg, task_id)
-            state.add_pending(task_id, "collector_followup", draft, "email", metadata={"collector": c["name"]})
+            bot.send_with_keyboard(chat_id, msg, task_id, buttons=[
+                ("✅ 답장 발송", f"approve:{task_id}"),
+                ("❌ 무시", f"dismiss:{task_id}"),
+            ])
+            state.add_pending(
+                task_id, "inbox_reply", analysis, "email",
+                to=mail.sender,
+                metadata={
+                    "sender": mail.sender,
+                    "sender_name": mail.sender_name,
+                    "subject": mail.subject,
+                    "original_uid": mail.uid,
+                },
+            )
             count += 1
         return count
 
@@ -1380,6 +1407,7 @@ class TelegramBot:
             self._handle_news_publish(chat_id, msg_id, payload)
 
     def _handle_approve(self, chat_id, msg_id, task_id):
+        """Approve AND execute: actually send email, post to website, etc."""
         from agent_state import AgentState
         state = AgentState()
         pending = state.get_pending(task_id)
@@ -1387,16 +1415,149 @@ class TelegramBot:
             self.send_message(chat_id, "⚠️ 이 항목은 이미 처리되었거나 만료되었습니다.")
             return
 
-        state.approve(task_id)
-        state.save()
-
-        # Edit original message to show approved
         try:
             self.api("editMessageReplyMarkup", chat_id=chat_id, message_id=msg_id, reply_markup={"inline_keyboard": []})
         except Exception:
             pass
 
-        self.send_message(chat_id, f"✅ 승인 완료: `{task_id}`")
+        task_type = pending.get("type", "")
+        draft = pending.get("draft", "")
+        metadata = pending.get("metadata", {})
+        executed = False
+        result_msg = ""
+
+        # --- Collector follow-up: SEND the email ---
+        if task_type == "collector_followup":
+            collector_name = metadata.get("collector", "")
+            # Find collector email from data
+            collectors = load_json(COLLECTORS_PATH)
+            collector = next((c for c in collectors if c.get("name") == collector_name), None)
+            email_addr = collector.get("email", "") if collector else ""
+
+            if email_addr:
+                try:
+                    from naver_works_mail import send_mail
+                    # Extract subject from draft
+                    subject_match = re.search(r"\*\*Subject:\s*(.+?)\*\*", draft)
+                    subject = subject_match.group(1) if subject_match else f"Follow-up from Sun Gallery"
+                    # Clean draft for email body
+                    body = re.sub(r"\*\*Subject:.*?\*\*\s*---\s*", "", draft).strip()
+                    send_mail(email_addr, subject, body)
+                    result_msg = f"✅ 이메일 발송 완료!\nTo: {collector_name} <{email_addr}>"
+                    executed = True
+                except Exception as e:
+                    result_msg = f"✅ 승인됨 (이메일 발송 실패: {e})\n드래프트는 저장되었습니다."
+            else:
+                result_msg = f"✅ 승인됨 (이메일 주소 없음: {collector_name})\n수동 발송이 필요합니다."
+
+        # --- News publish: POST to website ---
+        elif task_type == "news_draft":
+            title = metadata.get("title", "공지")
+            client = _get_sac_client()
+            if client:
+                try:
+                    news = client.create_news({"title": title, "content": draft, "category": "전시"})
+                    result_msg = f"✅ 홈페이지 공지 게시 완료! (#{news.get('id', '')})"
+                    executed = True
+                except Exception as e:
+                    result_msg = f"✅ 승인됨 (게시 실패: {e})"
+            else:
+                result_msg = "✅ 승인됨 (SAC API 미설정)"
+
+        # --- SNS content: add to queue (and post if API configured) ---
+        elif task_type == "sns_content":
+            try:
+                from sns_marketing import add_to_queue, make_content_id, parse_sns_response, post_to_instagram, post_to_x
+                parsed = parse_sns_response(draft)
+                content_id = make_content_id(metadata.get("content_type", "post"))
+                content = {
+                    "id": content_id,
+                    "type": metadata.get("content_type", "post"),
+                    "platform": ["instagram", "x"],
+                    "instagram_text": parsed["instagram_text"],
+                    "x_text": parsed["x_text"],
+                    "hashtags": parsed["hashtags"],
+                    "image_prompt": parsed["image_prompt"],
+                    "status": "queued",
+                    "scheduled_date": date.today().isoformat(),
+                }
+                add_to_queue(content)
+
+                # Try actual posting if API keys are configured
+                posted_to = []
+                try:
+                    ig_result = post_to_instagram("", parsed["instagram_text"])
+                    if ig_result:
+                        posted_to.append("Instagram")
+                except Exception:
+                    pass
+                try:
+                    x_result = post_to_x(parsed["x_text"][:280])
+                    if x_result:
+                        posted_to.append("X")
+                except Exception:
+                    pass
+
+                if posted_to:
+                    result_msg = f"✅ SNS 게시 완료! ({', '.join(posted_to)})"
+                else:
+                    result_msg = f"✅ 큐에 추가됨 (SNS 계정 미설정 — 계정 연결 후 자동 게시)"
+                executed = True
+            except Exception as e:
+                result_msg = f"✅ 승인됨 (큐 추가 실패: {e})"
+
+        # --- Inbox reply: SEND reply email ---
+        elif task_type == "inbox_reply":
+            to_addr = pending.get("to", "") or metadata.get("sender", "")
+            subject = metadata.get("subject", "")
+            if to_addr:
+                try:
+                    from naver_works_mail import send_mail
+                    # Extract reply body from Claude's analysis
+                    reply_body = draft
+                    # Try to find just the draft portion
+                    draft_match = re.search(r"(?:드래프트|Draft|답장)[:\s]*\n(.*)", draft, re.DOTALL)
+                    if draft_match:
+                        reply_body = draft_match.group(1).strip()
+                    send_mail(to_addr, f"Re: {subject}", reply_body)
+                    result_msg = f"✅ 답장 발송 완료!\nTo: {to_addr}\nRe: {subject}"
+                    executed = True
+                except Exception as e:
+                    result_msg = f"✅ 승인됨 (발송 실패: {e})"
+            else:
+                result_msg = "✅ 승인됨 (수신자 주소 없음)"
+
+        # --- Website update: POST to SAC API ---
+        elif task_type == "website_update":
+            client = _get_sac_client()
+            if client:
+                try:
+                    endpoint = metadata.get("endpoint", "")
+                    api_data = metadata.get("api_data", {})
+                    if endpoint == "exhibition":
+                        client.create_exhibition(api_data)
+                        result_msg = "✅ 홈페이지 전시 등록 완료!"
+                    elif endpoint == "news":
+                        client.create_news(api_data)
+                        result_msg = "✅ 홈페이지 공지 게시 완료!"
+                    elif endpoint == "site_image":
+                        client.update_site_image(api_data.get("key", ""), api_data.get("imageUrl", ""))
+                        result_msg = "✅ 홈페이지 이미지 업데이트 완료!"
+                    else:
+                        result_msg = f"✅ 승인 완료 (알 수 없는 엔드포인트: {endpoint})"
+                    executed = True
+                except Exception as e:
+                    result_msg = f"✅ 승인됨 (API 호출 실패: {e})"
+            else:
+                result_msg = "✅ 승인됨 (SAC API 미설정)"
+
+        # --- Default: just approve ---
+        else:
+            result_msg = f"✅ 승인 완료: `{task_id}`"
+
+        state.approve(task_id)
+        state.save()
+        self.send_message(chat_id, result_msg)
 
     def _handle_dismiss(self, chat_id, msg_id, task_id):
         from agent_state import AgentState
