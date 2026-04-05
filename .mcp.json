@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "naver-works-mail": {
+      "command": "python3",
+      "args": ["mcp-servers/naver-works-mail/server.py"],
+      "env": {
+        "NAVER_WORKS_EMAIL": "",
+        "NAVER_WORKS_PASSWORD": ""
+      }
+    }
+  }
+}
